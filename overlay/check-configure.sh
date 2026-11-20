@@ -7,9 +7,11 @@
 #
 # flags:   reads FF_CONFIGURE from the generated Dockerfile (every --enable-... switch).
 # summary: reads configure's "External libraries" summaries from the build log, which also
-#          shows what configure autodetected on its own.
+#          shows what configure autodetected on its own, and the configure command line that
+#          build.sh traces as "+ ./configure ...".
 # Fails if anything is enabled that the list does not allow, if a required name is missing,
-# or if a forbidden licence switch or library appears.
+# if a forbidden licence switch or library appears, or if the configure line has
+# --enable-libmfx or (summary) lacks --enable-libvpl (D-306).
 set -euo pipefail
 
 OVERLAY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -58,6 +60,10 @@ else
         /^Libraries:$/ { if (on) exit }
         on { print }' "$INPUT")"
     grep -q '^External libraries:$' "$INPUT" || fail "configure summary not found in $INPUT"
+    line="$(grep -m1 -E '^\++ \./configure ' "$INPUT" || true)"
+    [[ -n "$line" ]] || fail "no '+ ./configure ...' line in $INPUT"
+    configure="${line#*./configure }"
+    echo "configure: $configure"
     echo "configure summary (external libraries, then hardware acceleration):"
     echo "$section" | sed '/^[[:space:]]*$/d; s/^/  /'
     for word in $section; do
@@ -68,6 +74,16 @@ fi
 
 problems=0
 problem() { echo "  FAIL  $*"; problems=$((problems + 1)); }
+
+# D-306: --enable-libvpl makes configure check the oneVPL dispatcher (pkg-config "vpl") under
+# the name libmfx, so the summary lists libmfx beside libvpl. That is allowed; the old Intel
+# Media SDK (--enable-libmfx) never is.
+if [[ " $configure " == *" --enable-libmfx "* ]]; then
+    problem "--enable-libmfx is on the configure line (the old Intel Media SDK, D-306)"
+fi
+if [[ "$MODE" == summary && " $configure " != *" --enable-libvpl "* ]]; then
+    problem "the configure line lacks --enable-libvpl, the only way libmfx may be enabled (D-306)"
+fi
 
 declare -A SEEN=()
 for name in "${ENABLED[@]}"; do

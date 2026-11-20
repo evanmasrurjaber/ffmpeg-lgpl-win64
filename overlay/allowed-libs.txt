@@ -3,7 +3,8 @@
 # Column 1: the name as configure knows it: --enable-<name> in FF_CONFIGURE, or as configure
 #           prints it in its "External libraries" summaries ('-' and '_' count as the same).
 # Column 2: yes      must be enabled, in both checks
-#           summary  must appear in configure's summary (Windows autodetects it, so it has no flag)
+#           summary  must appear in configure's summary (Windows autodetects it, or configure sets it
+#                    itself as for libmfx, so it has no flag)
 #           no       may be enabled, need not be
 # Anything enabled that is not listed fails the check.
 
@@ -22,6 +23,10 @@ amf              yes       # MIT headers: h264_amf
 ffnvcodec        yes       # MIT headers: h264_nvenc, NVDEC
 cuda_llvm        yes       # CUDA filters compiled with clang; comes with ffnvcodec
 libvpl           yes       # MIT: h264_qsv
+libmfx           summary   # Not a library of its own: --enable-libvpl checks the oneVPL dispatcher
+                           # (pkg-config "vpl") under configure's internal name libmfx, so the summary
+                           # lists both. check-configure.sh fails --enable-libmfx (the old Intel Media
+                           # SDK) and, in the summary check, a configure line without --enable-libvpl (D-306)
 
 # Thread model of the toolchain (a configure switch, not a library)
 pthreads         no

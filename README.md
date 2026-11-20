@@ -26,7 +26,7 @@ Each release carries the zip, the complete corresponding source (`…-source.tar
 ## Where this repository comes from
 
 This repository is a copy of `tools/ffmpeg-build/` in the ClipForge repository, at commit
-`2d26bd1359b3d10fff3abb510358d0b87b7b9f2e`. Changes are made and reviewed there first, then copied here.
+`f4f3614c868d3c59d355f7f7692f9b0639e8924a`. Changes are made and reviewed there first, then copied here.
 
 ## Layout
 
