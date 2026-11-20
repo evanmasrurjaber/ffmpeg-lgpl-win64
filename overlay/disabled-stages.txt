@@ -1,0 +1,90 @@
+# FFmpeg-Builds stages the lgpl-min build drops (D-045). One script per line, relative to
+# upstream/scripts.d/. overlay/apply.sh appends `ffbuild_enabled() { return -1; }` to each,
+# so the library is not built and generate.sh passes its --disable-... flag to configure.
+#
+# Listed: every stage the upstream win64 lgpl 9.0 build enables that we do not keep, and
+# every script of a dropped folder stage. Stages that are only dependencies of dropped
+# stages (libogg, brotli, pcre2, ...) are not built once their users are gone, so they are
+# not listed. A stage that upstream adds later is caught by overlay/allowed-libs.txt.
+
+# Force LGPLv3 (FFmpeg's EXTERNAL_LIBRARY_VERSION3_LIST, and OpenSSL 3 on a non-GPL build)
+25-gmp.sh
+25-openssl.sh
+50-libaribb24.sh
+50-opencore-amr.sh
+
+# Software encoders for patent-encumbered codecs (H.264, HEVC, VVC)
+50-openh264.sh
+50-kvazaar.sh
+50-vvenc.sh
+
+# AV1 encoders (dav1d decodes AV1)
+50-aom.sh
+50-rav1e.sh
+50-svtav1.sh
+55-rustdedup.sh
+
+# Network: the shipped app is offline (configure also gets --disable-network)
+50-schannel.sh
+50-libssh.sh
+50-srt.sh
+50-libzmq.sh
+50-librist/40-mbedtls.sh
+50-librist/50-librist.sh
+
+# Fonts: libass uses DirectWrite on Windows; fontconfig and its libxml2 are not needed
+45-fonts/35-fontconfig.sh
+25-libxml2.sh
+
+# Vulkan and the filters that need it (HDR tone mapping uses zimg instead)
+47-vulkan/40-vulkan-headers.sh
+47-vulkan/45-vulkan-loader.sh
+47-vulkan/50-shaderc.sh
+47-vulkan/55-spirv-cross.sh
+47-vulkan/60-spirv-headers.sh
+47-vulkan/99-enable.sh
+50-libplacebo.sh
+
+# SVG decoding (librsvg with glib, cairo and pango)
+50-librsvg/10-glib.sh
+50-librsvg/20-cairo.sh
+50-librsvg/30-pango.sh
+50-librsvg/99-librsvg.sh
+
+# Formats, filters, devices and plugins nothing uses
+25-libpng.sh
+25-xz.sh
+45-lcms2.sh
+45-libvorbis.sh
+45-opencl.sh
+45-vmaf.sh
+50-chromaprint.sh
+50-gme.sh
+50-lcevcdec.sh
+50-libaribcaption.sh
+50-libbluray.sh
+50-libjxl/50-libjxl.sh
+50-libmp3lame.sh
+50-libtheora.sh
+50-libwebp.sh
+50-lilv/96-lv2.sh
+50-lilv/96-serd.sh
+50-lilv/96-zix.sh
+50-lilv/97-sord.sh
+50-lilv/98-sratom.sh
+50-lilv/99-lilv.sh
+50-openal.sh
+50-openapv.sh
+50-openjpeg.sh
+50-openmpt.sh
+50-sdl.sh
+50-snappy.sh
+50-soxr.sh
+50-twolame.sh
+50-uavs3d.sh
+50-vaapi/30-libpciaccess.sh
+50-vaapi/40-libdrm.sh
+50-vaapi/50-libva.sh
+50-vaapi/99-finalize.sh
+50-vapoursynth.sh
+50-zvbi.sh

@@ -1,0 +1,37 @@
+# What the lgpl-min build may enable (D-045). Read by overlay/check-configure.sh.
+#
+# Column 1: the name as configure knows it: --enable-<name> in FF_CONFIGURE, or as configure
+#           prints it in its "External libraries" summaries ('-' and '_' count as the same).
+# Column 2: yes      must be enabled, in both checks
+#           summary  must appear in configure's summary (Windows autodetects it, so it has no flag)
+#           no       may be enabled, need not be
+# Anything enabled that is not listed fails the check.
+
+# The libraries this build keeps
+iconv            yes       # GNU libiconv (LGPL-2.1+): libass dependency, subtitle charsets
+zlib             yes       # Zlib: PNG, compressed MOV headers
+libfribidi       yes       # LGPL-2.1+: libass
+libfreetype      yes       # FTL: libass glyphs
+libharfbuzz      yes       # MIT: libass text shaping
+libass           yes       # ISC: the ass and subtitles filters
+libdav1d         yes       # BSD-2-Clause: AV1 decoding
+libvpx           yes       # BSD-3-Clause: VP9 proxy fallback
+libopus          yes       # BSD-3-Clause: Opus for the WebM fallback
+libzimg          yes       # WTFPL: zscale, HDR to SDR
+amf              yes       # MIT headers: h264_amf
+ffnvcodec        yes       # MIT headers: h264_nvenc, NVDEC
+cuda_llvm        yes       # CUDA filters compiled with clang; comes with ffnvcodec
+libvpl           yes       # MIT: h264_qsv
+
+# Thread model of the toolchain (a configure switch, not a library)
+pthreads         no
+
+# Windows interfaces configure detects on its own
+mediafoundation  summary   # h264_mf
+nvenc            summary   # h264_nvenc
+cuda             no
+cuvid            no
+nvdec            no
+d3d11va          no
+d3d12va          no
+dxva2            no

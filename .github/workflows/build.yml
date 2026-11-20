@@ -1,0 +1,168 @@
+# Builds FFmpeg for Windows x64 under LGPL-2.1-or-later and drafts a release (D-045).
+# Lives at .github/workflows/build.yml in the public build repository; its reviewed source is
+# tools/ffmpeg-build/workflows/build.yml in the ClipForge repository (see README.md).
+#
+# Jobs: check (the recipe, in about a minute) -> build (images, FFmpeg, packaging; 1.5-2 h)
+#       -> verify (scripts/verify-ffmpeg.ps1 on Windows) -> release (a draft; a person publishes).
+name: Build FFmpeg
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-ffmpeg
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Check the recipe
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: true
+          persist-credentials: false
+      - name: Apply the overlay
+        run: bash overlay/apply.sh
+      - name: Generate the build plan
+        run: |
+          source build.conf
+          cd upstream
+          ./generate.sh "$TARGET" "$VARIANT" "$ADDIN"
+      - name: Check the configure flags
+        run: bash overlay/check-configure.sh flags upstream/Dockerfile
+      - name: Check the release is new
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          source build.conf
+          tag="${FFMPEG_TAG}-r${BUILD_NUMBER}"
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            echo "::error::Release $tag already exists; raise BUILD_NUMBER in build.conf"
+            exit 1
+          fi
+
+  build:
+    name: Build
+    needs: check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: true
+          persist-credentials: false
+      - name: Check the tools
+        run: |
+          for tool in docker git xz zip unzip tar sha256sum; do
+            command -v "$tool" > /dev/null || { echo "::error::$tool is not installed"; exit 1; }
+          done
+          docker buildx version
+      - name: Apply the overlay
+        run: bash overlay/apply.sh
+      - name: Free disk space
+        run: bash upstream/util/free_disk_space.sh
+      - name: Build the images
+        run: |
+          # Third-party build output must not be read as workflow commands.
+          echo "::stop-commands::$(cat /proc/sys/kernel/random/uuid)"
+          source build.conf
+          cd upstream
+          ./makeimage.sh "$TARGET" "$VARIANT" "$ADDIN"
+      - name: Build FFmpeg
+        run: |
+          echo "::stop-commands::$(cat /proc/sys/kernel/random/uuid)"
+          set -o pipefail
+          source build.conf
+          cd upstream
+          GIT_BRANCH_OVERRIDE="$FFMPEG_TAG" ./build.sh "$TARGET" "$VARIANT" "$ADDIN" 2>&1 | tee ../build.log
+      - name: Check the configure summary
+        run: bash overlay/check-configure.sh summary build.log
+      - name: Package
+        run: bash package.sh build.log
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: build-log
+          path: build.log
+          if-no-files-found: ignore
+          retention-days: 30
+
+  verify:
+    name: Verify on Windows
+    needs: build
+    runs-on: windows-2025
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist
+      - name: Verify the binaries
+        shell: pwsh
+        run: |
+          $conf = @{}
+          foreach ($line in Get-Content build.conf) {
+            if ($line -match '^([A-Z_]+)=(.*)$') { $conf[$Matches[1]] = $Matches[2].Trim() }
+          }
+          $release = "$($conf.FFMPEG_TAG)-r$($conf.BUILD_NUMBER)"
+          $zip = "dist/ffmpeg-$release-win64-lgpl.zip"
+          Expand-Archive -LiteralPath $zip -DestinationPath unpacked
+          pwsh -NoProfile -File scripts/verify-ffmpeg.ps1 `
+            -FfmpegDir "unpacked/ffmpeg-$release-win64-lgpl/bin" `
+            -ExpectedVersion $release `
+            -RequireEncoders libvpx-vp9
+          exit $LASTEXITCODE
+
+  release:
+    name: Draft the release
+    needs: [build, verify]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist
+      - name: Create the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          source build.conf
+          tag="${FFMPEG_TAG}-r${BUILD_NUMBER}"
+          notes="$(mktemp)"
+          {
+            echo "FFmpeg ${FFMPEG_TAG#n} for Windows x64, static ffmpeg.exe and ffprobe.exe, LGPL-2.1-or-later."
+            echo
+            echo "Built by [workflow run ${GITHUB_RUN_ID}](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}) from commit ${GITHUB_SHA}."
+            echo "\`ffmpeg-${tag}-source.tar\` holds the complete corresponding source. NOTICE.txt in the zip lists every library and its licence."
+            echo
+            echo '```'
+            cat dist/SHA256SUMS
+            echo '```'
+          } > "$notes"
+          gh release create "$tag" dist/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --draft \
+            --target "$GITHUB_SHA" \
+            --title "FFmpeg ${FFMPEG_TAG#n} build ${BUILD_NUMBER} (win64, LGPL-2.1+)" \
+            --notes-file "$notes"
