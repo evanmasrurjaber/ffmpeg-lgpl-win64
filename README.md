@@ -26,7 +26,7 @@ Each release carries the zip, the complete corresponding source (`…-source.tar
 ## Where this repository comes from
 
 This repository is a copy of `tools/ffmpeg-build/` in the ClipForge repository, at commit
-`f4f3614c868d3c59d355f7f7692f9b0639e8924a`. Changes are made and reviewed there first, then copied here.
+`5400a03560bf57c21ed1f7b4599dcbec008e3b1c`. Changes are made and reviewed there first, then copied here.
 
 ## Layout
 
@@ -40,7 +40,8 @@ This repository is a copy of `tools/ffmpeg-build/` in the ClipForge repository, 
 | `overlay/disabled-stages.txt` | The FFmpeg-Builds stages this build drops, with reasons |
 | `overlay/allowed-libs.txt` | What configure may enable; anything else fails the build |
 | `overlay/check-configure.sh` | Checks the configure flags and configure's summary against that list |
-| `package.sh` | Makes the release zip, the source archive and `SHA256SUMS` |
+| `package.sh` | Makes the release zip, the source archive and `SHA256SUMS`; `--check-licences` runs only its licence checks |
+| `tests/package-licences.sh` | Offline tests of `package.sh`'s licence checks: `GCC_FILES=<folder with COPYING3 and COPYING.RUNTIME> bash tests/package-licences.sh upstream` |
 | `.github/workflows/build.yml` | check → build → verify → draft release, run by hand |
 | `scripts/verify-ffmpeg.ps1` | Checks the binaries on Windows (copied from ClipForge) |
 
